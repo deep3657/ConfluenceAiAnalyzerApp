@@ -1,6 +1,13 @@
-# Confluence AI Analyzer
+# RCA Insight Engine (Project "Recall")
 
-A Java-based Spring Boot application for performing AI analysis on Confluence content.
+AI-powered Root Cause Analysis engine that uses RAG (Retrieval-Augmented Generation) to provide intelligent root cause suggestions based on historical Confluence RCA documents.
+
+## Architecture
+
+This is a full-stack application consisting of:
+
+- **Backend**: Spring Boot REST API (Java 25, Gradle, PostgreSQL + PGVector)
+- **Frontend**: React + TypeScript UI (Vite, Tailwind CSS)
 
 ## Requirements
 
@@ -96,12 +103,28 @@ The application includes a health check endpoint:
   - Actuator endpoints configured
 - **Logging**: `src/main/resources/logback.xml`
 
-## Next Steps
+## Frontend
 
-1. Implement Confluence REST API client to fetch content
-2. Integrate AI analysis logic
-3. Add configuration for Confluence credentials and AI API keys
-4. Implement result processing and output
+The frontend is a React + TypeScript application located in the `frontend/` directory.
+
+### Getting Started
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+The frontend will be available at `http://localhost:3000` and automatically proxies API requests to the backend.
+
+See [frontend/README.md](frontend/README.md) for detailed frontend documentation.
+
+### Features
+
+- **Search Interface**: Semantic search for RCA documents with AI-powered suggestions
+- **Ingestion Management**: Sync and manage Confluence data ingestion
+- **Statistics Dashboard**: View system statistics and processing status
+- **Real-time Updates**: Auto-refreshing stats and sync status polling
 
 ## License
 

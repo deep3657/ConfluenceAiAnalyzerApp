@@ -32,6 +32,12 @@ bin/
 *.log
 logs/
 
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/*.local
+
 # Application specific
 *.properties
 !gradle.properties

@@ -1,0 +1,134 @@
+package com.confluenceai.analyzer.service.impl;
+
+import com.confluenceai.analyzer.dto.ParsedRcaDto;
+import com.confluenceai.analyzer.dto.SearchResult;
+import com.confluenceai.analyzer.entity.RcaEmbedding;
+import com.confluenceai.analyzer.entity.RcaPage;
+import com.confluenceai.analyzer.repository.ParsedRcaRepository;
+import com.confluenceai.analyzer.repository.RcaEmbeddingRepository;
+import com.confluenceai.analyzer.repository.RcaPageRepository;
+import com.confluenceai.analyzer.service.EmbeddingService;
+import com.confluenceai.analyzer.service.SearchService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
+
+@Service
+public class SearchServiceImpl implements SearchService {
+    
+    private static final Logger logger = LoggerFactory.getLogger(SearchServiceImpl.class);
+    
+    private final EmbeddingService embeddingService;
+    private final RcaEmbeddingRepository embeddingRepository;
+    private final RcaPageRepository pageRepository;
+    private final ParsedRcaRepository parsedRcaRepository;
+    private final double minSimilarityScore;
+    
+    public SearchServiceImpl(
+            EmbeddingService embeddingService,
+            RcaEmbeddingRepository embeddingRepository,
+            RcaPageRepository pageRepository,
+            ParsedRcaRepository parsedRcaRepository,
+            @Value("${search.min-similarity-score:0.7}") double minSimilarityScore) {
+        this.embeddingService = embeddingService;
+        this.embeddingRepository = embeddingRepository;
+        this.pageRepository = pageRepository;
+        this.parsedRcaRepository = parsedRcaRepository;
+        this.minSimilarityScore = minSimilarityScore;
+    }
+    
+    @Override
+    public List<SearchResult> searchSimilarRCAs(String query, int topK, String userId) {
+        // Generate embedding for query
+        List<Float> queryEmbedding = embeddingService.generateEmbedding(query);
+        if (queryEmbedding.isEmpty()) {
+            logger.warn("Failed to generate embedding for query: {}", query);
+            return new ArrayList<>();
+        }
+        
+        // Convert to vector string format
+        String vectorString = formatVector(queryEmbedding);
+        
+        // Calculate max distance from similarity score (1 - similarity = distance)
+        double maxDistance = 1.0 - minSimilarityScore;
+        
+        // Perform similarity search
+        List<Object[]> results = embeddingRepository.findSimilarEmbeddings(
+                vectorString, maxDistance, topK);
+        
+        return convertToSearchResults(results);
+    }
+    
+    @Override
+    public List<SearchResult> searchBySymptoms(String symptoms, int topK) {
+        return searchSimilarRCAs(symptoms, topK, null);
+    }
+    
+    @Override
+    public List<SearchResult> searchByRootCause(String rootCause, int topK) {
+        // Generate embedding
+        List<Float> queryEmbedding = embeddingService.generateEmbedding(rootCause);
+        if (queryEmbedding.isEmpty()) {
+            return new ArrayList<>();
+        }
+        
+        String vectorString = formatVector(queryEmbedding);
+        double maxDistance = 1.0 - minSimilarityScore;
+        
+        // Search only in ROOT_CAUSE chunks
+        List<Object[]> results = embeddingRepository.findSimilarEmbeddingsWithFilters(
+                vectorString, maxDistance, "ROOT_CAUSE", null, topK);
+        
+        return convertToSearchResults(results);
+    }
+    
+    private List<SearchResult> convertToSearchResults(List<Object[]> rawResults) {
+        return rawResults.stream()
+                .map(this::convertToSearchResult)
+                .filter(result -> result.getSimilarityScore() >= minSimilarityScore)
+                .collect(Collectors.toList());
+    }
+    
+    private SearchResult convertToSearchResult(Object[] row) {
+        // row[0] = RcaEmbedding entity, row[1] = similarity score
+        RcaEmbedding embedding = (RcaEmbedding) row[0];
+        Double similarity = ((Number) row[1]).doubleValue();
+        
+        RcaPage page = pageRepository.findByPageId(embedding.getPageId())
+                .orElse(null);
+        
+        ParsedRcaDto parsedRca = null;
+        var parsedRcaOpt = parsedRcaRepository.findByPageId(embedding.getPageId());
+        if (parsedRcaOpt.isPresent()) {
+            var pr = parsedRcaOpt.get();
+            parsedRca = new ParsedRcaDto();
+            parsedRca.setPageId(pr.getPageId());
+            parsedRca.setSymptoms(pr.getSymptoms());
+            parsedRca.setRootCause(pr.getRootCause());
+            parsedRca.setResolution(pr.getResolution());
+            parsedRca.setIncidentDate(pr.getIncidentDate());
+        }
+        
+        SearchResult result = new SearchResult();
+        result.setPageId(embedding.getPageId());
+        result.setTitle(page != null ? page.getTitle() : "");
+        result.setContent(embedding.getContent());
+        result.setConfluenceUrl(page != null ? page.getUrl() : "");
+        result.setSimilarityScore(similarity);
+        result.setChunkType(embedding.getChunkType());
+        result.setFullRCA(parsedRca);
+        return result;
+    }
+    
+    private String formatVector(List<Float> vector) {
+        return "[" + vector.stream()
+                .map(f -> String.format("%.6f", f))
+                .collect(Collectors.joining(",")) + "]";
+    }
+}
+
