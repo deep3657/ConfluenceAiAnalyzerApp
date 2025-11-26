@@ -1,0 +1,120 @@
+Product Requirement Document: RCA Insight Engine (Project "Recall")
+1. Executive Summary
+Objective: Build a system that ingests historical Root Cause Analysis (RCA) documents from Atlassian Confluence, indexes the data, and uses Natural Language Processing (NLP) to suggest potential root causes for newly reported incidents based on symptom similarity.
+Target Audience: SREs, DevOps Engineers, and Software Developers.
+
+2. Scope Definitions
+In-Scope (MVP)
+Confluence Integration: Automated scraping of specific Confluence spaces/pages labeled as "RCA" or "Post-Mortem."
+Data Parsing: Extracting key fields (Symptoms, Root Cause, Resolution, Timeline) from unstructured HTML/Text.
+Search & Inference Engine: A query interface where users input a current issue description and receive similar historical cases.
+Relevance Scoring: Ranking results based on semantic similarity.
+Out-of-Scope (Phase 1)
+Automatic execution of fix scripts.
+Real-time integration with monitoring tools (e.g., Datadog, Prometheus) to auto-trigger searches (planned for Phase 2).
+Writing new RCA documents automatically.
+
+3. Functional Requirements
+3.1 Data Ingestion (The Scraper)
+ID
+Requirement
+Priority
+Description
+FR-01
+Confluence Auth
+P0
+System must authenticate via Atlassian API using OAuth 2.0 or PAT (Personal Access Tokens).
+FR-02
+Page Filtering
+P0
+System must only ingest pages containing specific tags (e.g., rca, post-mortem) or within a specific parent hierarchy.
+FR-03
+Incremental Sync
+P1
+Scraper should run on a schedule (e.g., every 24 hours) and only fetch pages modified since the last run.
+FR-04
+Structure Awareness
+P1
+The parser must identify specific headers (e.g., "Why it happened," "Symptoms") to separate the problem from the solution.
+
+3.2 Data Processing & Storage
+ID
+Requirement
+Priority
+Description
+FR-05
+Text Cleaning
+P0
+Remove HTML tags, macros, and irrelevant navigation text from the scraped content.
+FR-06
+Vectorization
+P0
+Convert text chunks (specifically the "Symptoms" and "Root Cause" sections) into vector embeddings using an LLM embedding model (e.g., OpenAI text-embedding-3 or open-source equivalents).
+FR-07
+Vector Database
+P0
+Store embeddings in a vector store (e.g., Pinecone, Milvus, or PGVector) for semantic search.
+
+3.3 The Recommendation Engine (The Brain)
+ID
+Requirement
+Priority
+Description
+FR-08
+Semantic Search
+P0
+When a user inputs an issue, the system converts the input to a vector and performs a generic similarity search against stored RCA vectors.
+FR-09
+LLM Synthesis
+P1
+Instead of just listing links, the system should pass the retrieved context to an LLM to generate a summary: "Based on RCAs #102 and #45, the root cause is likely a connection pool exhaustion."
+FR-10
+Citation
+P0
+Every suggestion must include a direct link back to the original source Confluence page for verification.
+
+3.4 User Interface
+ID
+Requirement
+Priority
+Description
+FR-11
+Search Portal
+P0
+Simple web UI with a large text area for pasting logs or issue descriptions.
+FR-12
+Jira Integration
+P2
+(Optional) A browser extension or Jira sidebar widget that auto-suggests RCAs when viewing a Jira Ticket.
+
+
+4. High-Level Architecture
+To build this, the team will need to implement a RAG (Retrieval-Augmented Generation) pipeline.
+
+Getty Images
+Explore
+Source: Confluence API.
+ETL Pipeline: Python scripts (using libraries like BeautifulSoup or LangChain) to clean and chunk text.
+Knowledge Base: Vector Database (stores the "memory" of past incidents).
+Query Engine: Takes the new bug report $\rightarrow$ Embeds it $\rightarrow$ Finds neighbors in DB.
+Generation: LLM summarizes findings for the user.
+
+5. Non-Functional Requirements
+Latency: Search results and suggestions must be generated within < 5 seconds.
+Accuracy: The system should not hallucinate (invent) root causes. If no relevant historical data exists, it must state: "No similar historical incidents found."
+Security: The system must respect Confluence permissions. If a user does not have access to a specific Confluence Space, the system must not return results from that space (requires User-Level permissions mapping).
+Data Freshness: Data in the search engine should be no older than 24 hours.
+
+6. Data Strategy & Parsing Logic
+One of the hardest parts of this project is that humans write RCAs inconsistently. You need a strategy to standardize the data.
+The "5 Whys" Extraction Strategy:
+When scraping, the system should look for keywords to categorize text segments:
+Input Segments (Symptoms): Look for headers like "Impact," "Symptoms," "Alerts fired," "User Reports."
+Output Segments (Root Cause): Look for headers like "Root Cause," "Technical Fault," "Why," "The Fix."
+Note: If the Confluence pages are unstructured, you may need to use an LLM during the ingestion phase to read the page and extract/summarize the "Root Cause" into a clean field before storing it.
+
+7. Success Metrics (KPIs)
+Hit Rate: Percentage of searches where the user clicks on one of the suggested historical RCAs.
+Resolution Speed: Reduction in MTTR (Mean Time To Resolution) for repeat incidents.
+User Feedback: Simple "Thumbs Up/Down" on the suggested root cause accuracy.
+
