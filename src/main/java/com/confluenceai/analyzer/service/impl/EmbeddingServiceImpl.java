@@ -11,6 +11,7 @@ import okhttp3.OkHttpClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -18,6 +19,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
+@ConditionalOnProperty(name = "embedding.provider", havingValue = "openai")
 public class EmbeddingServiceImpl implements EmbeddingService {
     
     private static final Logger logger = LoggerFactory.getLogger(EmbeddingServiceImpl.class);

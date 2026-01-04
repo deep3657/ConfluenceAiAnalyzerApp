@@ -35,7 +35,7 @@ public class RcaEmbedding {
     @Column(name = "content", nullable = false, columnDefinition = "TEXT")
     private String content;
     
-    @Column(name = "embedding", columnDefinition = "vector(1536)")
+    @Column(name = "embedding", columnDefinition = "vector(768)")
     private String embedding; // Stored as string, converted to/from vector in repository
     
     @Column(name = "metadata", columnDefinition = "JSONB")

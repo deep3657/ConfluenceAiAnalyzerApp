@@ -253,18 +253,21 @@ public class IngestionServiceImpl implements IngestionService {
         // Generate embeddings in batch
         List<List<Float>> embeddings = embeddingService.generateEmbeddings(chunks);
         
-        // Save embeddings
-            for (int i = 0; i < chunks.size(); i++) {
-                if (i < embeddings.size() && !embeddings.get(i).isEmpty()) {
-                    RcaEmbedding embedding = new RcaEmbedding();
-                    embedding.setPageId(pageId);
-                    embedding.setChunkIndex(i);
-                    embedding.setChunkType(chunkType);
-                    embedding.setContent(chunks.get(i));
-                    embedding.setEmbeddingVector(embeddings.get(i));
-                    embeddingRepository.save(embedding);
-                }
+        // Save embeddings using native query with proper vector casting
+        LocalDateTime now = LocalDateTime.now();
+        for (int i = 0; i < chunks.size(); i++) {
+            if (i < embeddings.size() && !embeddings.get(i).isEmpty()) {
+                UUID id = UUID.randomUUID();
+                String embeddingStr = "[" + embeddings.get(i).stream()
+                        .map(f -> String.format("%.6f", f))
+                        .reduce((a, b) -> a + "," + b)
+                        .orElse("") + "]";
+                
+                embeddingRepository.insertWithVector(
+                    id, pageId, i, chunkType, chunks.get(i), embeddingStr, now, now
+                );
             }
+        }
     }
     
     private SyncResponse convertToSyncResponse(SyncHistory syncHistory) {

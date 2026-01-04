@@ -32,16 +32,25 @@ public class DocumentParserServiceImpl implements DocumentParserService {
     
     @Override
     public ParsedRcaDto parseDocument(ConfluencePage page) {
-        String content = cleanHtml(page.getBody());
-        Document doc = Jsoup.parse(content);
+        String rawContent = page.getBody();
+        String content = cleanHtml(rawContent);
+        Document doc = Jsoup.parse(rawContent);
         
-        String symptoms = extractSymptoms(content).stream()
+        String symptoms = extractSymptoms(rawContent).stream()
                 .reduce((a, b) -> a + "\n" + b)
                 .orElse("");
         
-        String rootCause = extractRootCause(content);
-        String resolution = extractResolution(content);
+        String rootCause = extractRootCause(rawContent);
+        String resolution = extractResolution(rawContent);
         LocalDateTime incidentDate = extractIncidentDate(doc);
+        
+        // If no specific sections found, use the full content
+        // This ensures we always have something to embed
+        if (symptoms.isEmpty() && rootCause.isEmpty()) {
+            logger.debug("No specific sections found for page {}, using full content", page.getId());
+            // Use full cleaned content as "symptoms" for embedding
+            symptoms = content;
+        }
         
         ParsedRcaDto dto = new ParsedRcaDto();
         dto.setPageId(page.getId());

@@ -59,7 +59,7 @@ CREATE TABLE IF NOT EXISTS rca_embeddings (
     chunk_index INTEGER NOT NULL,
     chunk_type VARCHAR(50) NOT NULL, -- 'SYMPTOMS' or 'ROOT_CAUSE'
     content TEXT NOT NULL,
-    embedding vector(1536), -- OpenAI text-embedding-3-large dimension
+    embedding vector(768), -- Gemini text-embedding-004 dimension (768) or OpenAI (1536)
     metadata JSONB,
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW(),

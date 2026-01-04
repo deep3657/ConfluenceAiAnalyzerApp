@@ -95,15 +95,17 @@ public class SearchServiceImpl implements SearchService {
     }
     
     private SearchResult convertToSearchResult(Object[] row) {
-        // row[0] = RcaEmbedding entity, row[1] = similarity score
-        RcaEmbedding embedding = (RcaEmbedding) row[0];
-        Double similarity = ((Number) row[1]).doubleValue();
+        // Native query returns columns: id, page_id, chunk_index, chunk_type, content, embedding, metadata, created_at, updated_at, similarity
+        // Indices: 0=id, 1=page_id, 2=chunk_index, 3=chunk_type, 4=content, 5=embedding, 6=metadata, 7=created_at, 8=updated_at, 9=similarity
+        String pageId = (String) row[1];
+        String chunkType = (String) row[3];
+        String content = (String) row[4];
+        Double similarity = ((Number) row[9]).doubleValue();
         
-        RcaPage page = pageRepository.findByPageId(embedding.getPageId())
-                .orElse(null);
+        RcaPage page = pageRepository.findByPageId(pageId).orElse(null);
         
         ParsedRcaDto parsedRca = null;
-        var parsedRcaOpt = parsedRcaRepository.findByPageId(embedding.getPageId());
+        var parsedRcaOpt = parsedRcaRepository.findByPageId(pageId);
         if (parsedRcaOpt.isPresent()) {
             var pr = parsedRcaOpt.get();
             parsedRca = new ParsedRcaDto();
@@ -115,12 +117,12 @@ public class SearchServiceImpl implements SearchService {
         }
         
         SearchResult result = new SearchResult();
-        result.setPageId(embedding.getPageId());
+        result.setPageId(pageId);
         result.setTitle(page != null ? page.getTitle() : "");
-        result.setContent(embedding.getContent());
+        result.setContent(content);
         result.setConfluenceUrl(page != null ? page.getUrl() : "");
         result.setSimilarityScore(similarity);
-        result.setChunkType(embedding.getChunkType());
+        result.setChunkType(chunkType);
         result.setFullRCA(parsedRca);
         return result;
     }
