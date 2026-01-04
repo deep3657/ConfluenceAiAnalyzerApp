@@ -58,14 +58,28 @@ public class IngestionServiceImpl implements IngestionService {
     }
     
     @Override
-    @Async
     public SyncResponse startSync(SyncRequest request) {
+        // Create sync history record immediately and return
         SyncHistory syncHistory = new SyncHistory();
         syncHistory.setSyncType(request.getSyncType());
         syncHistory.setSpacesSynced(request.getSpaceKeys().toArray(new String[0]));
         syncHistory.setStatus("RUNNING");
         syncHistory.setStartedAt(LocalDateTime.now());
         syncHistory = syncHistoryRepository.save(syncHistory);
+        
+        // Start async processing
+        performSyncAsync(syncHistory.getId(), request);
+        
+        // Return immediately with initial response
+        SyncResponse response = convertToSyncResponse(syncHistory);
+        response.setMessage("Sync started successfully");
+        return response;
+    }
+    
+    @Async
+    public void performSyncAsync(UUID syncId, SyncRequest request) {
+        SyncHistory syncHistory = syncHistoryRepository.findById(syncId)
+                .orElseThrow(() -> new RuntimeException("Sync not found: " + syncId));
         
         try {
             int pagesFetched = 0;
@@ -75,7 +89,7 @@ public class IngestionServiceImpl implements IngestionService {
             LocalDateTime lastSync = null;
             if ("INCREMENTAL".equals(request.getSyncType())) {
                 var lastSyncOpt = syncHistoryRepository.findFirstByOrderByStartedAtDesc();
-                if (lastSyncOpt.isPresent()) {
+                if (lastSyncOpt.isPresent() && !lastSyncOpt.get().getId().equals(syncId)) {
                     lastSync = lastSyncOpt.get().getStartedAt();
                 }
             }
@@ -91,14 +105,25 @@ public class IngestionServiceImpl implements IngestionService {
                 
                 pagesFetched += pages.size();
                 
+                // Update progress
+                syncHistory.setPagesFetched(pagesFetched);
+                syncHistoryRepository.save(syncHistory);
+                
                 for (ConfluencePage page : pages) {
                     try {
+                        // Save page first
+                        savePageMetadata(page);
                         processPage(page.getId());
                         pagesProcessed++;
                     } catch (Exception e) {
                         logger.error("Error processing page {}", page.getId(), e);
                         pagesFailed++;
                     }
+                    
+                    // Update progress after each page
+                    syncHistory.setPagesProcessed(pagesProcessed);
+                    syncHistory.setPagesFailed(pagesFailed);
+                    syncHistoryRepository.save(syncHistory);
                 }
             }
             
@@ -109,15 +134,29 @@ public class IngestionServiceImpl implements IngestionService {
             syncHistory.setCompletedAt(LocalDateTime.now());
             syncHistoryRepository.save(syncHistory);
             
+            logger.info("Sync {} completed. Fetched: {}, Processed: {}, Failed: {}", 
+                    syncId, pagesFetched, pagesProcessed, pagesFailed);
+            
         } catch (Exception e) {
-            logger.error("Error during sync", e);
+            logger.error("Error during sync {}", syncId, e);
             syncHistory.setStatus("FAILED");
             syncHistory.setErrorMessage(e.getMessage());
             syncHistory.setCompletedAt(LocalDateTime.now());
             syncHistoryRepository.save(syncHistory);
         }
-        
-        return convertToSyncResponse(syncHistory);
+    }
+    
+    private void savePageMetadata(ConfluencePage page) {
+        RcaPage rcaPage = rcaPageRepository.findByPageId(page.getId())
+                .orElse(new RcaPage());
+        rcaPage.setPageId(page.getId());
+        rcaPage.setSpaceKey(page.getSpaceKey());
+        rcaPage.setTitle(page.getTitle());
+        rcaPage.setUrl(page.getUrl());
+        rcaPage.setTags(page.getLabels() != null ? page.getLabels().toArray(new String[0]) : new String[0]);
+        rcaPage.setLastModified(page.getLastModified());
+        rcaPage.setStatus("PENDING");
+        rcaPageRepository.save(rcaPage);
     }
     
     @Override
@@ -232,9 +271,12 @@ public class IngestionServiceImpl implements IngestionService {
         SyncResponse response = new SyncResponse();
         response.setSyncId(syncHistory.getId());
         response.setStatus(syncHistory.getStatus());
-        response.setPagesFetched(syncHistory.getPagesFetched());
-        response.setPagesProcessed(syncHistory.getPagesProcessed());
-        response.setPagesFailed(syncHistory.getPagesFailed());
+        response.setMessage(syncHistory.getErrorMessage() != null ? syncHistory.getErrorMessage() : "Sync " + syncHistory.getStatus().toLowerCase());
+        response.setStartedAt(syncHistory.getStartedAt());
+        response.setCompletedAt(syncHistory.getCompletedAt());
+        response.setPagesFetched(syncHistory.getPagesFetched() != null ? syncHistory.getPagesFetched() : 0);
+        response.setPagesProcessed(syncHistory.getPagesProcessed() != null ? syncHistory.getPagesProcessed() : 0);
+        response.setPagesFailed(syncHistory.getPagesFailed() != null ? syncHistory.getPagesFailed() : 0);
         response.setEstimatedCompletionTime(syncHistory.getCompletedAt());
         return response;
     }

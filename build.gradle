@@ -8,20 +8,14 @@ group = 'com.confluenceai'
 version = '1.0.0'
 
 java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(25)
-    }
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
 }
 
-// Configure Java home for Java 25
+// Configure Java compilation - use source/target instead of release for Java 25 compatibility
 tasks.withType(JavaCompile).configureEach {
-    options.release = 25
-}
-
-// Set JAVA_HOME for Gradle
-if (System.getenv("JAVA_HOME") == null) {
-    def javaHome = "/opt/homebrew/opt/openjdk"
-    System.setProperty("java.home", javaHome)
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
 }
 
 repositories {

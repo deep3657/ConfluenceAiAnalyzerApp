@@ -85,6 +85,11 @@ export interface StatsResponse {
   }
 }
 
+export interface IngestionConfig {
+  spaces: string[]
+  tags: string[]
+}
+
 export interface RcaPage {
   pageId: string
   spaceKey: string
@@ -134,6 +139,11 @@ export const api = {
   // Management endpoints
   getStats: async (): Promise<StatsResponse> => {
     const response = await apiClient.get<StatsResponse>('/v1/stats')
+    return response.data
+  },
+
+  getIngestionConfig: async (): Promise<IngestionConfig> => {
+    const response = await apiClient.get<IngestionConfig>('/v1/config/ingestion')
     return response.data
   },
 

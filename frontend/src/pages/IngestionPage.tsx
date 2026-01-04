@@ -5,9 +5,10 @@ import { format } from 'date-fns'
 
 export default function IngestionPage() {
   const [syncType, setSyncType] = useState<'FULL' | 'INCREMENTAL'>('INCREMENTAL')
-  const [spaces, setSpaces] = useState('ENG,OPS')
-  const [tags, setTags] = useState('rca,post-mortem')
+  const [spaces, setSpaces] = useState('')
+  const [tags, setTags] = useState('')
   const [loading, setLoading] = useState(false)
+  const [configLoading, setConfigLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [activeSyncs, setActiveSyncs] = useState<Map<string, SyncResponse>>(new Map())
 
@@ -56,6 +57,24 @@ export default function IngestionPage() {
   }
 
   useEffect(() => {
+    // Fetch default config from backend
+    const fetchConfig = async () => {
+      try {
+        const config = await api.getIngestionConfig()
+        setSpaces(config.spaces.join(', '))
+        setTags(config.tags.join(', '))
+      } catch (err) {
+        console.error('Failed to fetch ingestion config:', err)
+        // Fallback defaults if config fetch fails
+        setSpaces('ENG, OPS')
+        setTags('rca, post-mortem')
+      } finally {
+        setConfigLoading(false)
+      }
+    }
+    
+    fetchConfig()
+    
     // Cleanup intervals on unmount
     return () => {
       // Intervals will be cleared when syncs complete
@@ -81,7 +100,7 @@ export default function IngestionPage() {
             <select
               value={syncType}
               onChange={(e) => setSyncType(e.target.value as 'FULL' | 'INCREMENTAL')}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 bg-white"
             >
               <option value="INCREMENTAL">Incremental (only new/updated pages)</option>
               <option value="FULL">Full (all pages)</option>
@@ -97,7 +116,7 @@ export default function IngestionPage() {
               value={spaces}
               onChange={(e) => setSpaces(e.target.value)}
               placeholder="ENG, OPS"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 bg-white placeholder:text-gray-500"
             />
           </div>
 
@@ -110,7 +129,7 @@ export default function IngestionPage() {
               value={tags}
               onChange={(e) => setTags(e.target.value)}
               placeholder="rca, post-mortem"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 bg-white placeholder:text-gray-500"
             />
           </div>
 

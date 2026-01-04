@@ -76,7 +76,7 @@ export default function SearchPage() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Describe the symptoms or issue you're investigating..."
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none text-gray-900 bg-white placeholder:text-gray-500"
               rows={3}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
@@ -94,7 +94,7 @@ export default function SearchPage() {
               <select
                 value={searchType}
                 onChange={(e) => setSearchType(e.target.value as SearchType)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 bg-white"
               >
                 <option value="general">General Search</option>
                 <option value="symptoms">Search by Symptoms</option>
@@ -112,7 +112,7 @@ export default function SearchPage() {
                 max="20"
                 value={topK}
                 onChange={(e) => setTopK(parseInt(e.target.value) || 5)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 bg-white"
               />
             </div>
           </div>

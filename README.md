@@ -103,6 +103,24 @@ The application includes a health check endpoint:
   - Actuator endpoints configured
 - **Logging**: `src/main/resources/logback.xml`
 
+## Quick Start
+
+To start both applications quickly:
+
+```bash
+# Option 1: Use the start script
+./start-apps.sh
+
+# Option 2: Manual start (see START_APPLICATION.md for details)
+# Terminal 1 - Backend
+./gradlew bootRun
+
+# Terminal 2 - Frontend
+cd frontend && npm run dev
+```
+
+**See [START_APPLICATION.md](START_APPLICATION.md) for detailed step-by-step instructions.**
+
 ## Frontend
 
 The frontend is a React + TypeScript application located in the `frontend/` directory.

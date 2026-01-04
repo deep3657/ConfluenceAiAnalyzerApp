@@ -30,16 +30,38 @@ public class ConfluenceServiceImpl implements ConfluenceService {
     private final Gson gson;
     private final String baseUrl;
     private final String authToken;
+    private final String authEmail;
+    private final boolean isCloudInstance;
     
     public ConfluenceServiceImpl(
             @Value("${confluence.base-url}") String baseUrl,
-            @Value("${confluence.auth.token}") String authToken) {
+            @Value("${confluence.auth.token}") String authToken,
+            @Value("${confluence.auth.email:}") String authEmail) {
         this.baseUrl = baseUrl;
         this.authToken = authToken;
+        this.authEmail = authEmail;
+        // Confluence Cloud uses .atlassian.net domain
+        this.isCloudInstance = baseUrl != null && baseUrl.contains(".atlassian.net");
         this.httpClient = new OkHttpClient.Builder()
                 .addInterceptor(new HttpLoggingInterceptor().setLevel(HttpLoggingInterceptor.Level.BASIC))
                 .build();
         this.gson = new Gson();
+        
+        logger.info("Confluence service initialized - Base URL: {}, Cloud instance: {}", baseUrl, isCloudInstance);
+    }
+    
+    /**
+     * Build the appropriate Authorization header based on instance type
+     */
+    private String getAuthorizationHeader() {
+        if (isCloudInstance && authEmail != null && !authEmail.isEmpty()) {
+            // Confluence Cloud: Basic Auth with email:api-token (Base64 encoded)
+            String credentials = authEmail + ":" + authToken;
+            return "Basic " + java.util.Base64.getEncoder().encodeToString(credentials.getBytes());
+        } else {
+            // Confluence Server/Data Center: Bearer token
+            return "Bearer " + authToken;
+        }
     }
     
     @Override
@@ -55,7 +77,7 @@ public class ConfluenceServiceImpl implements ConfluenceService {
                 
                 Request request = new Request.Builder()
                         .url(url)
-                        .header("Authorization", "Bearer " + authToken)
+                        .header("Authorization", getAuthorizationHeader())
                         .header("Accept", "application/json")
                         .get()
                         .build();
@@ -80,6 +102,9 @@ public class ConfluenceServiceImpl implements ConfluenceService {
                         // Filter by tags if provided
                         if (tags == null || tags.isEmpty() || hasAnyTag(page, tags)) {
                             pages.add(page);
+                            logger.debug("Page matched: {} (labels: {})", page.getTitle(), page.getLabels());
+                        } else {
+                            logger.trace("Page skipped (no matching tags): {} (labels: {})", page.getTitle(), page.getLabels());
                         }
                     }
                     
@@ -107,7 +132,7 @@ public class ConfluenceServiceImpl implements ConfluenceService {
             
             Request request = new Request.Builder()
                     .url(url)
-                    .header("Authorization", "Bearer " + authToken)
+                    .header("Authorization", getAuthorizationHeader())
                     .header("Accept", "application/json")
                     .get()
                     .build();
@@ -214,10 +239,16 @@ public class ConfluenceServiceImpl implements ConfluenceService {
     }
     
     private boolean hasAnyTag(ConfluencePage page, List<String> tags) {
-        if (page.getLabels() == null) {
+        if (page.getLabels() == null || page.getLabels().isEmpty()) {
             return false;
         }
-        return page.getLabels().stream().anyMatch(tags::contains);
+        // Case-insensitive tag matching
+        List<String> lowerTags = tags.stream()
+                .map(String::toLowerCase)
+                .toList();
+        return page.getLabels().stream()
+                .map(String::toLowerCase)
+                .anyMatch(lowerTags::contains);
     }
 }
 

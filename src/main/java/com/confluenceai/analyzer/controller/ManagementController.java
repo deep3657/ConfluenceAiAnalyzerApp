@@ -8,10 +8,13 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -20,9 +23,31 @@ import java.util.Map;
 public class ManagementController {
     
     private final RcaPageRepository rcaPageRepository;
+    private final String defaultSpaces;
+    private final String defaultTags;
     
-    public ManagementController(RcaPageRepository rcaPageRepository) {
+    public ManagementController(
+            RcaPageRepository rcaPageRepository,
+            @Value("${confluence.spaces:}") String defaultSpaces,
+            @Value("${confluence.tags:}") String defaultTags) {
         this.rcaPageRepository = rcaPageRepository;
+        this.defaultSpaces = defaultSpaces;
+        this.defaultTags = defaultTags;
+    }
+    
+    @Operation(
+            summary = "Get ingestion configuration",
+            description = "Returns the default configuration for ingestion including spaces and tags."
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Configuration retrieved successfully")
+    })
+    @GetMapping("/config/ingestion")
+    public ResponseEntity<Map<String, Object>> getIngestionConfig() {
+        Map<String, Object> config = new HashMap<>();
+        config.put("spaces", Arrays.asList(defaultSpaces.split(",")));
+        config.put("tags", Arrays.asList(defaultTags.split(",")));
+        return ResponseEntity.ok(config);
     }
     
     @Operation(

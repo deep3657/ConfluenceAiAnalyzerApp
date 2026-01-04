@@ -6,6 +6,9 @@ import java.util.UUID;
 public class SyncResponse {
     private UUID syncId;
     private String status; // RUNNING, COMPLETED, FAILED
+    private String message;
+    private LocalDateTime startedAt;
+    private LocalDateTime completedAt;
     private LocalDateTime estimatedCompletionTime;
     private Integer pagesFetched;
     private Integer pagesProcessed;
@@ -17,6 +20,12 @@ public class SyncResponse {
     public void setSyncId(UUID syncId) { this.syncId = syncId; }
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
+    public String getMessage() { return message; }
+    public void setMessage(String message) { this.message = message; }
+    public LocalDateTime getStartedAt() { return startedAt; }
+    public void setStartedAt(LocalDateTime startedAt) { this.startedAt = startedAt; }
+    public LocalDateTime getCompletedAt() { return completedAt; }
+    public void setCompletedAt(LocalDateTime completedAt) { this.completedAt = completedAt; }
     public LocalDateTime getEstimatedCompletionTime() { return estimatedCompletionTime; }
     public void setEstimatedCompletionTime(LocalDateTime estimatedCompletionTime) { this.estimatedCompletionTime = estimatedCompletionTime; }
     public Integer getPagesFetched() { return pagesFetched; }
