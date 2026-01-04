@@ -74,4 +74,25 @@ public interface RcaEmbeddingRepository extends JpaRepository<RcaEmbedding, UUID
         @Param("spaceKey") String spaceKey,
         @Param("limit") int limit
     );
+    
+    // Hybrid search: combines vector similarity with keyword matching
+    // Boosts results that contain the search keywords
+    @Query(value = """
+        SELECT e.*, 
+               (1 - (e.embedding <=> CAST(:queryVector AS vector))) AS vector_similarity,
+               CASE WHEN LOWER(e.content) LIKE LOWER(CONCAT('%', :keyword, '%')) THEN 0.3 ELSE 0.0 END AS keyword_boost,
+               (1 - (e.embedding <=> CAST(:queryVector AS vector))) + 
+               CASE WHEN LOWER(e.content) LIKE LOWER(CONCAT('%', :keyword, '%')) THEN 0.3 ELSE 0.0 END AS combined_score
+        FROM rca_embeddings e
+        WHERE e.embedding <=> CAST(:queryVector AS vector) < :maxDistance
+           OR LOWER(e.content) LIKE LOWER(CONCAT('%', :keyword, '%'))
+        ORDER BY combined_score DESC
+        LIMIT :limit
+        """, nativeQuery = true)
+    List<Object[]> findHybridSearch(
+        @Param("queryVector") String queryVector,
+        @Param("keyword") String keyword,
+        @Param("maxDistance") double maxDistance,
+        @Param("limit") int limit
+    );
 }

@@ -57,11 +57,33 @@ public class SearchServiceImpl implements SearchService {
         // Calculate max distance from similarity score (1 - similarity = distance)
         double maxDistance = 1.0 - minSimilarityScore;
         
-        // Perform similarity search
-        List<Object[]> results = embeddingRepository.findSimilarEmbeddings(
-                vectorString, maxDistance, topK);
+        // Extract primary keyword for hybrid search (use first significant word)
+        String keyword = extractKeyword(query);
         
-        return convertToSearchResults(results);
+        // Perform hybrid search (vector + keyword)
+        List<Object[]> results = embeddingRepository.findHybridSearch(
+                vectorString, keyword, maxDistance, topK * 2); // Fetch more to filter
+        
+        return convertToHybridSearchResults(results, topK);
+    }
+    
+    /**
+     * Extract the most significant keyword from the query for hybrid search
+     */
+    private String extractKeyword(String query) {
+        // Simple extraction: use the longest word that's not a common stop word
+        String[] words = query.toLowerCase().split("\\s+");
+        String keyword = "";
+        for (String word : words) {
+            if (word.length() > keyword.length() && !isStopWord(word)) {
+                keyword = word;
+            }
+        }
+        return keyword.isEmpty() ? query : keyword;
+    }
+    
+    private boolean isStopWord(String word) {
+        return List.of("the", "a", "an", "in", "on", "at", "for", "to", "of", "and", "or", "is", "was", "were", "are", "with", "from", "by").contains(word);
     }
     
     @Override
@@ -92,6 +114,49 @@ public class SearchServiceImpl implements SearchService {
                 .map(this::convertToSearchResult)
                 .filter(result -> result.getSimilarityScore() >= minSimilarityScore)
                 .collect(Collectors.toList());
+    }
+    
+    private List<SearchResult> convertToHybridSearchResults(List<Object[]> rawResults, int topK) {
+        // Hybrid query returns: all entity columns + vector_similarity + keyword_boost + combined_score
+        // Indices: 0-8 = entity columns, 9 = vector_similarity, 10 = keyword_boost, 11 = combined_score
+        return rawResults.stream()
+                .map(this::convertHybridToSearchResult)
+                .filter(result -> result.getSimilarityScore() >= minSimilarityScore * 0.8) // Slightly lower threshold for hybrid
+                .limit(topK)
+                .collect(Collectors.toList());
+    }
+    
+    private SearchResult convertHybridToSearchResult(Object[] row) {
+        // Hybrid query columns: id, page_id, chunk_index, chunk_type, content, embedding, metadata, created_at, updated_at, 
+        //                       vector_similarity, keyword_boost, combined_score
+        String pageId = (String) row[1];
+        String chunkType = (String) row[3];
+        String content = (String) row[4];
+        Double combinedScore = ((Number) row[11]).doubleValue(); // Use combined score
+        
+        RcaPage page = pageRepository.findByPageId(pageId).orElse(null);
+        
+        ParsedRcaDto parsedRca = null;
+        var parsedRcaOpt = parsedRcaRepository.findByPageId(pageId);
+        if (parsedRcaOpt.isPresent()) {
+            var pr = parsedRcaOpt.get();
+            parsedRca = new ParsedRcaDto();
+            parsedRca.setPageId(pr.getPageId());
+            parsedRca.setSymptoms(pr.getSymptoms());
+            parsedRca.setRootCause(pr.getRootCause());
+            parsedRca.setResolution(pr.getResolution());
+            parsedRca.setIncidentDate(pr.getIncidentDate());
+        }
+        
+        SearchResult result = new SearchResult();
+        result.setPageId(pageId);
+        result.setTitle(page != null ? page.getTitle() : "");
+        result.setContent(content);
+        result.setConfluenceUrl(page != null ? page.getUrl() : "");
+        result.setSimilarityScore(combinedScore);
+        result.setChunkType(chunkType);
+        result.setFullRCA(parsedRca);
+        return result;
     }
     
     private SearchResult convertToSearchResult(Object[] row) {
