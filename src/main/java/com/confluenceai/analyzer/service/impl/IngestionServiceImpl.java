@@ -247,8 +247,9 @@ public class IngestionServiceImpl implements IngestionService {
             rcaPage.setStatus("PARSED");
             rcaPageRepository.save(rcaPage);
             
-            // Save parsed RCA
-            ParsedRca parsedRcaEntity = new ParsedRca();
+            // Save or update parsed RCA (find existing by pageId to avoid duplicates)
+            ParsedRca parsedRcaEntity = parsedRcaRepository.findByPageId(pageId)
+                    .orElse(new ParsedRca());
             parsedRcaEntity.setPageId(pageId);
             parsedRcaEntity.setSymptoms(parsedRca.getSymptoms());
             parsedRcaEntity.setRootCause(parsedRca.getRootCause());
