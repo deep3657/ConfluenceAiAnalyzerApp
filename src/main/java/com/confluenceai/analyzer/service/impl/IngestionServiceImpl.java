@@ -13,6 +13,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -33,6 +34,7 @@ public class IngestionServiceImpl implements IngestionService {
     private final ParsedRcaRepository parsedRcaRepository;
     private final RcaEmbeddingRepository embeddingRepository;
     private final SyncHistoryRepository syncHistoryRepository;
+    private final TransactionTemplate transactionTemplate;
     private final int chunkSize;
     private final int chunkOverlap;
     
@@ -44,6 +46,7 @@ public class IngestionServiceImpl implements IngestionService {
             ParsedRcaRepository parsedRcaRepository,
             RcaEmbeddingRepository embeddingRepository,
             SyncHistoryRepository syncHistoryRepository,
+            TransactionTemplate transactionTemplate,
             @Value("${chunking.size:800}") int chunkSize,
             @Value("${chunking.overlap:150}") int chunkOverlap) {
         this.confluenceService = confluenceService;
@@ -53,6 +56,7 @@ public class IngestionServiceImpl implements IngestionService {
         this.parsedRcaRepository = parsedRcaRepository;
         this.embeddingRepository = embeddingRepository;
         this.syncHistoryRepository = syncHistoryRepository;
+        this.transactionTemplate = transactionTemplate;
         this.chunkSize = chunkSize;
         this.chunkOverlap = chunkOverlap;
     }
@@ -61,7 +65,10 @@ public class IngestionServiceImpl implements IngestionService {
     public SyncResponse startSync(SyncRequest request) {
         // Create sync history record immediately and return
         SyncHistory syncHistory = new SyncHistory();
-        syncHistory.setSyncType(request.getSyncType());
+        // Default to FULL if syncType is not provided
+        String syncType = request.getSyncType() != null && !request.getSyncType().isEmpty() 
+                ? request.getSyncType() : "FULL";
+        syncHistory.setSyncType(syncType);
         syncHistory.setSpacesSynced(request.getSpaceKeys().toArray(new String[0]));
         syncHistory.setStatus("RUNNING");
         syncHistory.setStartedAt(LocalDateTime.now());
@@ -94,13 +101,32 @@ public class IngestionServiceImpl implements IngestionService {
                 }
             }
             
+            // Get the optional limit
+            Integer limit = request.getLimit();
+            int totalProcessedWithLimit = 0;
+            boolean limitReached = false;
+            
             for (String spaceKey : request.getSpaceKeys()) {
+                if (limitReached) break;
+                
                 List<ConfluencePage> pages;
                 if (lastSync != null) {
                     pages = confluenceService.fetchModifiedPagesSince(
                             lastSync, List.of(spaceKey), request.getTags());
                 } else {
                     pages = confluenceService.fetchRCAPages(spaceKey, request.getTags());
+                }
+                
+                // Apply limit if specified
+                if (limit != null && limit > 0) {
+                    int remaining = limit - totalProcessedWithLimit;
+                    if (remaining <= 0) {
+                        limitReached = true;
+                        break;
+                    }
+                    if (pages.size() > remaining) {
+                        pages = pages.subList(0, remaining);
+                    }
                 }
                 
                 pagesFetched += pages.size();
@@ -113,11 +139,18 @@ public class IngestionServiceImpl implements IngestionService {
                     try {
                         // Save page first
                         savePageMetadata(page);
-                        processPage(page.getId());
+                        // Use transactionTemplate to ensure transaction context
+                        transactionTemplate.executeWithoutResult(status -> {
+                            processPageInternal(page.getId());
+                        });
                         pagesProcessed++;
+                        totalProcessedWithLimit++;
                     } catch (Exception e) {
                         logger.error("Error processing page {}", page.getId(), e);
+                        // Update page status to ERROR
+                        updatePageStatus(page.getId(), "ERROR", e.getMessage());
                         pagesFailed++;
+                        totalProcessedWithLimit++;
                     }
                     
                     // Update progress after each page
@@ -190,6 +223,14 @@ public class IngestionServiceImpl implements IngestionService {
     @Override
     @Transactional
     public void processPage(String pageId) {
+        // This is for external calls - uses Spring's @Transactional
+        processPageInternal(pageId);
+    }
+    
+    /**
+     * Internal method for processing page - called within transactionTemplate for internal calls
+     */
+    private void processPageInternal(String pageId) {
         RcaPage rcaPage = rcaPageRepository.findByPageId(pageId)
                 .orElseThrow(() -> new RuntimeException("RCA page not found: " + pageId));
         
@@ -243,6 +284,14 @@ public class IngestionServiceImpl implements IngestionService {
             rcaPageRepository.save(rcaPage);
             throw e;
         }
+    }
+    
+    private void updatePageStatus(String pageId, String status, String errorMessage) {
+        rcaPageRepository.findByPageId(pageId).ifPresent(page -> {
+            page.setStatus(status);
+            page.setErrorMessage(errorMessage);
+            rcaPageRepository.save(page);
+        });
     }
     
     private void createEmbeddings(String pageId, List<String> chunks, String chunkType) {

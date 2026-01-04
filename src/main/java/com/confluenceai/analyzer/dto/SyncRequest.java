@@ -9,6 +9,7 @@ public class SyncRequest {
     private List<String> spaceKeys;
     private String syncType; // FULL, INCREMENTAL
     private List<String> tags;
+    private Integer limit; // Optional: limit number of pages to process
     
     public SyncRequest() {}
     
@@ -26,4 +27,7 @@ public class SyncRequest {
         return tags != null ? tags : new ArrayList<>(); 
     }
     public void setTags(List<String> tags) { this.tags = tags; }
+    
+    public Integer getLimit() { return limit; }
+    public void setLimit(Integer limit) { this.limit = limit; }
 }

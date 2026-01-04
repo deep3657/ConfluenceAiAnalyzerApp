@@ -59,8 +59,13 @@ public class SearchController {
             List<SearchResult> results = searchService.searchSimilarRCAs(
                     request.getQuery(), topK, userId);
             
-            // Generate LLM summary
-            String summary = llmService.generateSummary(request.getQuery(), results);
+            // Generate LLM summary (optional - may fail if LLM not configured)
+            String summary = "Similar incidents found. Configure LLM for AI-generated summaries.";
+            try {
+                summary = llmService.generateSummary(request.getQuery(), results);
+            } catch (Exception e) {
+                logger.warn("LLM summary generation failed, returning results without summary: {}", e.getMessage());
+            }
             
             // Determine confidence based on similarity scores
             String confidence = determineConfidence(results);
@@ -102,7 +107,12 @@ public class SearchController {
             int topK = request.getTopK() != null ? request.getTopK() : defaultTopK;
             List<SearchResult> results = searchService.searchBySymptoms(request.getQuery(), topK);
             
-            String summary = llmService.generateSummary(request.getQuery(), results);
+            String summary = "Similar incidents found.";
+            try {
+                summary = llmService.generateSummary(request.getQuery(), results);
+            } catch (Exception e) {
+                logger.warn("LLM summary generation failed: {}", e.getMessage());
+            }
             String confidence = determineConfidence(results);
             
             SearchResponse.Summary summaryObj = new SearchResponse.Summary();
@@ -142,7 +152,12 @@ public class SearchController {
             int topK = request.getTopK() != null ? request.getTopK() : defaultTopK;
             List<SearchResult> results = searchService.searchByRootCause(request.getQuery(), topK);
             
-            String summary = llmService.synthesizeRootCause(results);
+            String summary = "Root cause analysis from similar incidents.";
+            try {
+                summary = llmService.synthesizeRootCause(results);
+            } catch (Exception e) {
+                logger.warn("LLM root cause synthesis failed: {}", e.getMessage());
+            }
             String confidence = determineConfidence(results);
             
             SearchResponse.Summary summaryObj = new SearchResponse.Summary();

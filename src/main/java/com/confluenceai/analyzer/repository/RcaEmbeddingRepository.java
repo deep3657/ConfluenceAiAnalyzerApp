@@ -18,11 +18,13 @@ public interface RcaEmbeddingRepository extends JpaRepository<RcaEmbedding, UUID
     
     List<RcaEmbedding> findByPageIdAndChunkType(String pageId, String chunkType);
     
+    @Modifying
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
     void deleteByPageId(String pageId);
     
     // Native insert with proper vector casting
     @Modifying
-    @Transactional
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
     @Query(value = """
         INSERT INTO rca_embeddings (id, page_id, chunk_index, chunk_type, content, embedding, created_at, updated_at)
         VALUES (:id, :pageId, :chunkIndex, :chunkType, :content, CAST(:embedding AS vector), :createdAt, :updatedAt)

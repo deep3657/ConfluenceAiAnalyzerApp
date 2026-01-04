@@ -37,12 +37,21 @@ export interface SearchRequest {
 export interface SearchResult {
   pageId: string
   title: string
-  url: string
+  confluenceUrl: string
   similarityScore: number
+  content?: string
+  chunkType?: string
   symptoms?: string
   rootCause?: string
   resolution?: string
   incidentDate?: string
+  fullRCA?: {
+    pageId: string
+    symptoms?: string
+    rootCause?: string
+    resolution?: string
+    incidentDate?: string
+  }
 }
 
 export interface SearchSummary {

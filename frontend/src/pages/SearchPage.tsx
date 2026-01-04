@@ -223,7 +223,7 @@ function ResultCard({ result, index }: { result: SearchResult; index: number }) 
           </div>
         </div>
         <a
-          href={result.url}
+          href={result.confluenceUrl}
           target="_blank"
           rel="noopener noreferrer"
           className="ml-4 p-2 text-gray-400 hover:text-primary-600 transition-colors"
@@ -234,22 +234,28 @@ function ResultCard({ result, index }: { result: SearchResult; index: number }) 
       </div>
 
       <div className="ml-11 space-y-3">
-        {result.symptoms && (
+        {result.content && (
+          <div>
+            <h5 className="text-sm font-medium text-gray-700 mb-1">Matched Content ({result.chunkType}):</h5>
+            <p className="text-sm text-gray-600 line-clamp-3">{result.content}</p>
+          </div>
+        )}
+        {(result.fullRCA?.symptoms || result.symptoms) && (
           <div>
             <h5 className="text-sm font-medium text-gray-700 mb-1">Symptoms:</h5>
-            <p className="text-sm text-gray-600">{result.symptoms}</p>
+            <p className="text-sm text-gray-600 line-clamp-2">{result.fullRCA?.symptoms || result.symptoms}</p>
           </div>
         )}
-        {result.rootCause && (
+        {(result.fullRCA?.rootCause || result.rootCause) && (
           <div>
             <h5 className="text-sm font-medium text-gray-700 mb-1">Root Cause:</h5>
-            <p className="text-sm text-gray-600">{result.rootCause}</p>
+            <p className="text-sm text-gray-600 line-clamp-2">{result.fullRCA?.rootCause || result.rootCause}</p>
           </div>
         )}
-        {result.resolution && (
+        {(result.fullRCA?.resolution || result.resolution) && (
           <div>
             <h5 className="text-sm font-medium text-gray-700 mb-1">Resolution:</h5>
-            <p className="text-sm text-gray-600">{result.resolution}</p>
+            <p className="text-sm text-gray-600 line-clamp-2">{result.fullRCA?.resolution || result.resolution}</p>
           </div>
         )}
       </div>
